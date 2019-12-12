@@ -223,9 +223,9 @@ class Configurable_mt : public TObject { // this is needed in case we'd liek to 
    EventWeight = "*xsec_lumi_weight*weight";
    TString TSLeaf=""; //base: ggH_sm_htt125
    //TString SampleNameDummy=SampleName;//the step may not be needed..
-   if(SampleName.Contains("SM"))EventWeight+="*gen_sm_htt125";
-   else if(SampleName.Contains("PS"))EventWeight+="*gen_ps_htt125";
-   else if(SampleName.Contains("MM"))EventWeight+="*gen_mm_htt125";
+   if(sample.Contains("SM"))EventWeight+="*gen_sm_htt125";
+   else if(sample.Contains("PS"))EventWeight+="*gen_ps_htt125";
+   else if(sample.Contains("MM"))EventWeight+="*gen_mm_htt125";
      
    //define pt and category cuts
   

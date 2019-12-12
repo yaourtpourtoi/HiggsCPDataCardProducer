@@ -126,7 +126,7 @@ void ProduceDataCards(
       //obtain the OS histograms
       gROOT->cd(); //this will put us to the directory where the histograms are located. it is needed to draw for control purposes..
       dummy->cd();//to fetch the drawing of the histogram
-
+			
       tree->Draw(Configs.at(std::make_pair(catIndex,sample))->ObservableDraw+">>"+Configs.at(std::make_pair(catIndex,sample))->HistoName2D,Configs.at(std::make_pair(catIndex,sample))->SRCut);
 
       if(sample=="data") cout<<"Configs.at(std::make_pair(catIndex,sample))->HistoName2D "<<Configs.at(std::make_pair(catIndex,sample))->HistoName2D <<"\n Configs.at(std::make_pair(catIndex,sample))->ObservableDraw "<< Configs.at(std::make_pair(catIndex,sample))->ObservableDraw<<"\n Configs.at(std::make_pair(catIndex,sample))->SRCut "<<Configs.at(std::make_pair(catIndex,sample))->SRCut <<"\n Configs.at(std::make_pair(catIndex,sample))->TwoDimHisto->GetSumOfWeights()  "<<Configs.at(std::make_pair(catIndex,sample))->TwoDimHisto->GetSumOfWeights()<<"\n" <<endl;
@@ -276,4 +276,3 @@ void ProduceDataCards(
   cout<<"create file in Configurable_mt::OutputFileDataCard  "<<Configurable_mt::OutputFileDataCard<<endl;
   return;
 }
-
