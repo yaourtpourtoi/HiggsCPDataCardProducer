@@ -11,21 +11,34 @@ Written by Merijn van de klundert, mvandekl@cern.ch
 #include "TH2F.h"
 #include "TSystem.h"
 #include <iostream>
+#include <map>
+#include <iomanip>
+
 #include "TDirectory.h"
 #include "TMath.h"
 #include "TROOT.h"
+#include "TString.h"
+
+template<typename KeyTemp, typename ValTemp>
+std::vector<KeyTemp> extract_keys(std::map<KeyTemp, ValTemp> const& input_map) {
+  std::vector<KeyTemp> keys;
+  for (auto const& element : input_map) {
+    keys.push_back(element.first);
+  }
+  return keys;
+}
 
 
 using namespace std;
 
-class Configurable_mt : public TObject { // this is needed in case we'd like to add the class to root
+class Configurable_mt : public TObject { // this is needed in case we'd liek to add the class to root
 
    public :
   // Default CTOR, needed by ROOT
   Configurable_mt(){};
   
   //constructor. We only initialise objects for a specific sample-cat combination, anything else is specified via the static members
-  Configurable_mt(int category_, int sample_){
+  Configurable_mt(int category_, TString sample_){
     cat=category_;
     sample=sample_;
   }
@@ -37,23 +50,66 @@ class Configurable_mt : public TObject { // this is needed in case we'd like to 
     
     cout<<"OneDimHisto->GetName() "<<OneDimHisto->GetName()<<endl;
     cout<<"OneDimHistoSS->GetName() "<<OneDimHistoSS->GetName()<<endl;
+    cout<<"OneDimHistoAR->GetName() "<<OneDimHistoAR->GetName()<<endl;
     cout<<"TwoDimHisto->GetName() "<<TwoDimHisto->GetName()<<endl;
     cout<<"TwoDimHistoSS->GetName() "<<TwoDimHistoSS->GetName()<<endl;
+    cout<<"TwoDimHistoAR->GetName() "<<TwoDimHistoAR->GetName()<<endl;
     
     delete OneDimHisto;
     delete OneDimHistoSS;    
+    delete OneDimHistoAR;    
     delete TwoDimHisto;
     delete TwoDimHistoSS;
+    delete TwoDimHistoAR;
     //alternatively, use something like delete gROOT->FindObject("mt_2017_NoCat_mutau_IPdata_obsSS");    
   }
   
   //STATIC DATA MEMBERS
   //SampleNames: always Data first (call data_obs), qcd last. Signals need to have 125 in the sample name in order not to be subtracted in qcd calc. These signal names are format as expected by CH
-  inline static const vector<TString> SampleNames{"data_obs","Ztt","Zll","TT","VV","W","ggH_sm_htt125", "ggH_ps_htt125", "ggH_mm_htt125","qqH_sm_htt125", "qqH_ps_htt125", "qqH_mm_htt125","QCD"};
+  //inline static const vector<TString> SampleNames{"data_obs","Ztt","Zll","TT","VV","W","ggH_sm_htt125", "ggH_ps_htt125", "ggH_mm_htt125","qqH_sm_htt125", "qqH_ps_htt125", "qqH_mm_htt125","QCD"};
+  inline static const map<TString,TString> SampleNames{
+    {"data", "data_obs"},
+    {"Ztt", "Ztt"},
+    {"Zll", "Zll"},
+    {"TT", "TT"},
+    {"ST", "ST"},
+    {"VV", "VV"},
+    {"W", "W"},
+    {"ggHSM", "ggH_sm_htt125"},
+    {"ggHPS", "ggH_ps_htt125"},
+    {"ggHMM", "ggH_mm_htt125"},
+    {"qqHSM", "qqH_sm_htt125"},
+    {"qqHPS", "qqH_ps_htt125"},
+    {"qqHMM", "qqH_mm_htt125"},
+    {"QCD", "QCD"},
+    {"fakes", "fakes"},
+    {"embedded", "EMB"}
+  };
+  inline static const map<TString,TString> FileNames{
+    {"data", "mt-NOMINAL_ntuple_Data"},
+    {"Ztt", "mt-NOMINAL_ntuple_DY"},
+    {"Zll", "mt-NOMINAL_ntuple_DY"},
+    {"TT", "mt-NOMINAL_ntuple_TT"},
+    {"ST", "mt-NOMINAL_ntuple_ST"},
+    {"VV", "mt-NOMINAL_ntuple_VV"},
+    {"W", "mt-NOMINAL_ntuple_W"},
+    {"ggHSM", "mt-NOMINAL_ntuple_ggH125"},
+    {"ggHPS", "mt-NOMINAL_ntuple_ggH125"},
+    {"ggHMM", "mt-NOMINAL_ntuple_ggH125"},
+    {"qqHSM", "mt-NOMINAL_ntuple_qqH125"},
+    {"qqHPS", "mt-NOMINAL_ntuple_qqH125"},
+    {"qqHMM", "mt-NOMINAL_ntuple_qqH125"},
+    {"embedded", "mt-NOMINAL_ntuple_EMB"}
+  };
   
   //Important: BaseCatNames ALWAYS expects NoCat at the end! for the last entry no category cut will be applied.
-  inline static const vector<TString> BaseCatNames{"ggH","qqH","Ztt","Zll","W","tt","QCD","misc","NoCat"};
-  inline static vector<TString> CatNames; //CatNames will just be BaseCatNames, prepended with mt_ , et_. This vector is cleared and push_back is used to fill
+  //  inline static const map<int,TString> CategoryNames{{0,"ggH"},{1,"qqH"},{2,"Ztt"},{3,"Zll"},{4,"W"},{5,"tt"},{6,"QCD"},{7,"misc"},{-1,"NoCat"}};
+
+
+  inline static const map<int,TString> CategoryNames{{0,"higgs"},{1,"ztt"},{2,"top"},{3,"fakes"},{-1,"NoCat"}};
+
+
+  inline static map<int,TString> CatNames; //CatNames will just be CategoryNames, prepended with mt_ , et_. This vector is cleared and push_back is used to fill
   inline static TString InputFileDir; 
   inline static TString OutputFileDir;
 
@@ -67,21 +123,27 @@ class Configurable_mt : public TObject { // this is needed in case we'd like to 
  inline static int decaymode; //0 is pion, 1 is rho. -1: no cut on decay mode! note: decay mode+method will specify the pt cuts in the selection cuts
  inline static int CPMethod; //0: IP method. 1: DP method. 
  inline static int Observable;
+ inline static TString ObservableName;
  inline static TString ObservableDraw; //declared in  InitObservableNames. This is used in main program from now onwards in the tree:: Draw!
  inline static TString ObservablePath; //declared in InitObservableNames. This is used to put a label to the plot and generate a path not containing semicolons
  inline static TString ObservableXaxis; //declared in InitObservableNames. used in plottng macro to assign x-axis label
  inline static TString ObservableYaxis; //declared in InitObservableNames. used in plottng macro to assign y-axis label
- 
+
+ inline static TString CommonCuts;
+ inline static int nSignalCategories;
+ inline static int nCategories;
+ inline static bool useEmbedded;
+ inline static bool FFmethod;
+
+
  //Default initialised. These may need to be made era-dependent
  inline static  double TTnorm = 1.0;   //scale factors for normalization of ttbar and wjets
- inline static  double Wnorm  = 1.0;  
- inline static  TString topweight="1*";   
- inline static  TString qcdweight="1*";
- inline static  TString zptmassweight="1*";                
+ inline static  double Wnorm  = 0.97;  
+ inline static  TString qcdweight="*1.06";               
  
  //configurable data members of the object
- uint cat; //cat is also the handle to run code in parallel
- int sample;
+ int cat; //cat is also the handle to run code in parallel
+ TString sample;
  
  //data members assign via initialise() function, after the static configurables have been set
  TString CatName, SampleName;
@@ -89,21 +151,25 @@ class Configurable_mt : public TObject { // this is needed in case we'd like to 
  int muonptcut; //currently always 20, but NOTE for decay plane method it may be lower!
  int TauChConstCut; //Note: it 
  TString selcut;
- TString FinalCut;// will contain the final cut applied to ->Draw() Method.
- TString FinalCutSS;// will contain the final cut applied to ->Draw() Method.
-
+ TString SRCut;// will contain the final cut applied to ->Draw() Method.
+ TString SSCut;// will contain the final cut applied to ->Draw() Method.
+ TString ARCut;
 
  //for the histogram
  TH1F* OneDimHisto=NULL;
  TH1F* OneDimHistoSS=NULL;
+ TH1F* OneDimHistoAR=NULL;
  TH2F* TwoDimHisto=NULL;
  TH2F* TwoDimHistoSS=NULL;
+ TH2F* TwoDimHistoAR=NULL;
 
  // these are (must!) initialised in InitHistogram
  TString HistoName, HistoTitle;
  TString HistoName2D, HistoTitle2D;
  TString HistoNameSS, HistoTitleSS;
  TString HistoNameSS2D, HistoTitleSS2D;
+ TString HistoNameAR, HistoTitleAR;
+ TString HistoNameAR2D, HistoTitleAR2D;
 
  //fixed in InitialiseXandYAxis
  float xmin, xmax;
@@ -113,7 +179,7 @@ class Configurable_mt : public TObject { // this is needed in case we'd like to 
  int nbinsy;
  double *  ybins=NULL;
 
- TString EventsWeight;
+ TString EventWeight;
  //later may extend with asking for tree name or vector with systematics..
 
  inline static void InitOutputBaseDir(){
@@ -147,64 +213,82 @@ class Configurable_mt : public TObject { // this is needed in case we'd like to 
  
  void Initialise(){
    //here define define cuts and weights. If different for 2016/2018, redeclar with simple if statement
-   SampleName=SampleNames[sample];
+
+   SampleName=SampleNames.at(sample);
    InputFileName+=InputFileDir;
-   InputFileName+=SampleNametoInputFile(SampleName);
-   CatName=CatNames[cat];
-   
+   if(sample!="QCD"&&sample!="fakes")InputFileName+=SampleNametoInputFile(sample);
+   CatName=CatNames.at(cat);
+
    //define the event weight
-   EventsWeight = "xsec_lumi_weight*puweight*effweight*mcweight*zptweight*topptweight*";
+   EventWeight = "*xsec_lumi_weight*weight";
    TString TSLeaf=""; //base: ggH_sm_htt125
-   TString SampleNameDummy=SampleName;//the step may not be needed..
-   if(SampleName.Contains("ggH")){TSLeaf=SampleNameDummy.ReplaceAll("ggH_","");TSLeaf.Prepend("gen_");TSLeaf.Append("*");} 
-   if(SampleName.Contains("qqH")){TSLeaf=SampleNameDummy.ReplaceAll("qqH_","");TSLeaf.Prepend("gen_");TSLeaf.Append("*");}
-   EventsWeight+=TSLeaf;
+   //TString SampleNameDummy=SampleName;//the step may not be needed..
+   if(SampleName.Contains("SM"))EventWeight+="*gen_sm_htt125";
+   else if(SampleName.Contains("PS"))EventWeight+="*gen_ps_htt125";
+   else if(SampleName.Contains("MM"))EventWeight+="*gen_mm_htt125";
      
    //define pt and category cuts
-   muonptcut=20; 
-  if(decaymode==-1||decaymode==11) TauChConstCut=0;  //
-  if(decaymode==0&&CPMethod==0) TauChConstCut=0;  //
-  if((decaymode==1&&CPMethod==0)||(decaymode==2&&CPMethod==0)) TauChConstCut=40; //ip method for rho
-  if((decaymode==1&&CPMethod==1)||(decaymode==2&&CPMethod==1)) TauChConstCut=0;  //dp method for rho
   
-  selcut="";
-  if(cat<(Configurable_mt::CatNames.size()-1)){//only add cat in case it is not "no cat"
-    selcut="&&predicted_class==";
-    selcut+=cat;}
+   //selcut="(byMediumDeepTau2017v2p1VSjet_2 >0.5 && mt_1<50)"; 
+  selcut=CommonCuts; 
+  if(cat!=-1){//only add cat in case it is not "no cat"
+    selcut+="*(predicted_class=="+TString::Itoa(cat,10)+")";
+  }
   
   if(decaymode!=-1){
-    selcut+="&&tau_decay_mode_2==";
-    selcut+=decaymode;}
+    selcut+="*(tau_decay_mode_2=="+TString::Itoa(decaymode,10)+")";
+  }
   
-  selcut+="&&pt_1>";
-  selcut+=muonptcut;
-  selcut+="&&pt_2>";
-  selcut+=TauChConstCut;
+  selcut+="*(pt_1>20)";
+  selcut+="*(pt_2>30)";
+  if(CPMethod==0&&(decaymode==1||decaymode==2)) selcut+="*(chpt_2>40)";//ip method for rho
+
+  //+=TauChConstCut;
    
-  selcut+="&&byMediumDeepTau2017v2p1VSjet_2 >0.5 &&mt_1<50"; 
+  SRCut=selcut+"*(os>0.5 && byMediumDeepTau2017v2p1VSjet_2>0.5 )";
+  SSCut=selcut+qcdweight+"*(os<0.5 && byMediumDeepTau2017v2p1VSjet_2>0.5 )";
+  ARCut=selcut+"*ff_nom*(os>0.5 && byMediumDeepTau2017v2p1VSjet_2<0.5 )";
 
   //here may want to load sample-specific cuts import from a cut directory
 
-  if(sample==0){
-    FinalCut="(os>0.5"+selcut+")";
-    FinalCutSS=qcdweight+"(os<0.5"+selcut+")";}
+  if(sample!="data"&&sample!="embedded"){//weights applied only on MC
+    SRCut+=EventWeight;
+    ARCut+=EventWeight;
+    SSCut+=EventWeight;
+    if(useEmbedded&&!(sample.Contains("ggH")||sample.Contains("qqH"))){
+      SRCut+="*(!(gen_match_2==5 &&gen_match_1==4))";
+      SSCut+="*(!(gen_match_2==5 &&gen_match_1==4))";
+      ARCut+="*(!(gen_match_2==5 &&gen_match_1==4))";
+    }
+    if(FFmethod&&!(sample.Contains("ggH")||sample.Contains("qqH"))){
+      SRCut+="*(gen_match_2!=6)";
+      SSCut+="*(gen_match_2!=6)";
+      ARCut+="*(gen_match_2!=6)";
+    }
+
+  }  
+  else if(sample=="embedded"){
+    SRCut+="*embweight*effweight*mcweight";
+    ARCut+="*embweight*effweight*mcweight";
+    SSCut+="*embweight*effweight*mcweight";
+  }
+
+  if(sample=="Ztt"){//Ztt
+    TString isZTT="*(gen_match_2==5)";
+    SRCut+=isZTT+"*zptweight";
+    ARCut+=isZTT+"*zptweight";
+    SSCut+=isZTT+"*zptweight";}
   
-  else if(sample==1){//Ztt
-    TString isZTT="(((gen_match_1==3||gen_match_1==4)&&gen_match_2==5)||((gen_match_2==3||gen_match_2==4)&&gen_match_1==5))*";
-    FinalCut=isZTT+EventsWeight+zptmassweight+"(os>0.5"+selcut+")";
-    FinalCutSS=isZTT+EventsWeight+zptmassweight+qcdweight+"(os<0.5"+selcut+")";}
-  
-  else if(sample==2){//Zll
-    TString isZLL="!(((gen_match_1==3||gen_match_1==4)&&gen_match_2==5)||((gen_match_2==3||gen_match_2==4)&&gen_match_1==5))*";
-    FinalCut=isZLL+EventsWeight+zptmassweight+"(os>0.5"+selcut+")";
-    FinalCutSS=isZLL+EventsWeight+zptmassweight+qcdweight+"(os<0.5"+selcut+")";
+  else if(sample=="Zll"){//Zll
+    TString isZLL="*!(gen_match_2==5)";
+    SRCut+=isZLL+"*zptweight";
+    SSCut+=isZLL+"*zptweight";
+    ARCut+=isZLL+"*zptweight";
   }    
-  else if(sample==3){
-    FinalCut=EventsWeight+topweight+"(os>0.5"+selcut+")";
-    FinalCutSS=EventsWeight+topweight+qcdweight+"(os<0.5"+selcut+")";}
-  else{
-    FinalCut=EventsWeight+"(os>0.5"+selcut+")";
-    FinalCutSS=EventsWeight+qcdweight+"(os<0.5"+selcut+")";}
+  else if(sample=="TT"){
+    SRCut+="*topptweight";
+    ARCut+="*topptweight";
+    SSCut+="*topptweight";}
     
   InitialiseXandYAxis(cat);
   InitHistogram();
@@ -212,7 +296,9 @@ class Configurable_mt : public TObject { // this is needed in case we'd like to 
   
 //HELPER FUNCTIONS
  TString SampleNametoInputFile(TString sample){
-   TString out="mt-NOMINAL_ntuple_";
+   TString filename=FileNames.at(sample);
+   /*
+   TString filename="mt-NOMINAL_ntuple_";
    TString SampleAppendix="";
    if(sample.Contains("data_obs")){
      SampleAppendix="Data";}
@@ -227,17 +313,19 @@ class Configurable_mt : public TObject { // this is needed in case we'd like to 
    
    else{
      SampleAppendix+=sample;}
-   out+=SampleAppendix;
-   out+=".root";
-   return out;
+     filename+=SampleAppendix;*/
+   filename+=".root";
+   return filename;
  }
 
  void InitHistogram(){    
    HistoName=CatName+SampleName;//we put this way to remain able to call with unique name. When unfoldig we rename to sample name
    HistoNameSS=CatName+SampleName+"SS";
+   HistoNameAR=CatName+SampleName+"AR";
 
    HistoName2D=CatName+SampleName+"_2D";
    HistoNameSS2D=CatName+SampleName+"SS"+"_2D";
+   HistoNameAR2D=CatName+SampleName+"AR"+"_2D";
 
    OneDimHisto=new TH1F(HistoName,HistoName,nbinsx,xbins);
    OneDimHisto->Sumw2();
@@ -249,6 +337,11 @@ class Configurable_mt : public TObject { // this is needed in case we'd like to 
    OneDimHistoSS->SetXTitle(ObservableXaxis);
    OneDimHistoSS->SetYTitle(ObservableYaxis);
    
+   OneDimHistoAR=new TH1F(HistoNameAR,HistoNameAR,nbinsx,xbins);
+   OneDimHistoAR->Sumw2();
+   OneDimHistoAR->SetXTitle(ObservableXaxis);
+   OneDimHistoAR->SetYTitle(ObservableYaxis);
+   
    TwoDimHisto=new TH2F(HistoName2D,HistoName2D,nbinsx,xbins,nbinsy,ybins);
    TwoDimHisto->Sumw2();
    TwoDimHisto->SetXTitle(ObservableXaxis);
@@ -257,7 +350,12 @@ class Configurable_mt : public TObject { // this is needed in case we'd like to 
    TwoDimHistoSS=new TH2F(HistoNameSS2D,HistoNameSS2D,nbinsx,xbins,nbinsy,ybins);
    TwoDimHistoSS->Sumw2();
    TwoDimHistoSS->SetXTitle(ObservableXaxis);
-   TwoDimHistoSS->SetYTitle(ObservableYaxis); }
+   TwoDimHistoSS->SetYTitle(ObservableYaxis);
+
+   TwoDimHistoAR=new TH2F(HistoNameAR2D,HistoNameAR2D,nbinsx,xbins,nbinsy,ybins);
+   TwoDimHistoAR->Sumw2();
+   TwoDimHistoAR->SetXTitle(ObservableXaxis);
+   TwoDimHistoAR->SetYTitle(ObservableYaxis); }
 
  void Write1DHistoToDir(TDirectory *CatDir){
    CatDir->cd();    
@@ -297,18 +395,19 @@ inline static TH1F * Unfold(TH2F * histInput) {
  inline static void InitCatNames(){
    CatNames.clear();
    TString BaseCat="";  
-   for(uint i=0; i<BaseCatNames.size();i++){
+   vector<int> categoryIndices=extract_keys(CategoryNames);
+   for(int categoryIndex : categoryIndices){
      BaseCat="mt_";
      BaseCat+=era;
      BaseCat+="_";
-     BaseCat+=BaseCatNames[i];
+     BaseCat+=CategoryNames.at(categoryIndex);
      if(decaymode==-1) BaseCat+="_mutau";
-     if(decaymode==0) BaseCat+="_mupi";
-     if(decaymode==1) BaseCat+="_murho";
-     if(decaymode==11) BaseCat+="_muother";
+     else if(decaymode==0) BaseCat+="_mupi";
+     else if(decaymode==1) BaseCat+="_murho";
+     else BaseCat+="_muother";
      if(CPMethod==0) BaseCat+="_IP";
-     if(CPMethod==1) BaseCat+="_DP";
-     CatNames.push_back(BaseCat);
+     else if(CPMethod==1) BaseCat+="_DP";
+     CatNames.insert({categoryIndex,BaseCat});
    }}
 
  inline static void InitObservableNames(){
@@ -337,7 +436,7 @@ inline static TH1F * Unfold(TH2F * histInput) {
    if(Observable==19){ ObservablePath="";   ObservableXaxis=""; }
    //observables > 20 reserved for NN score and CP angles
    if(Observable==20){ ObservablePath="predicted_prob";   ObservableXaxis="NN output"; ObservableYaxis="dN/d(NN output)";}
-   if(Observable==21){ ObservablePath="acotautau_0"; ObservablePath+=CPMethod;  ObservableXaxis="#phi CP"; }
+   if(Observable==21){ ObservablePath="acotautau_helix_0"; ObservablePath+=CPMethod;  ObservableXaxis="#phi CP"; }
    
    ObservableDraw+=ObservablePath;
  }
@@ -403,40 +502,40 @@ inline static TH1F * Unfold(TH2F * histInput) {
 
    //Provisional binning for mu+pi case, which we adopt for dm=-1 also
    if(DM==0||DM==-1){
-     if(CAT==0) tmp={0, 0.25, 0.3, 1};
-     if(CAT==1) tmp={0, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1}; //last bin must be 0.8 to 1, otherwise ratio goes bad.. cutting bins further in two gives issues
-     if(CAT==2) tmp={0, 0.35, 0.45, 0.55, 0.65, 1}; 
-     if(CAT==3) tmp={0, 0.25, 0.3, 0.4, 0.5, 0.6, 1}; 
-     if(CAT==4) tmp={0, 0.25, 0.35,0.4, 0.45, 1}; 
-     if(CAT==5) tmp={0, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 1}; 
-     if(CAT==6) tmp={0, 0.3, 0.4, 0.5, 0.6, 1}; 
-     if(CAT==7) tmp={0, 0.35, 0.45, 0.55, 0.65, 0.8, 1}; 
-     if(CAT==8) tmp={0, 0.3, 0.6, 1}; //DNN score range in case we pick no category, i.e. it is void observable in for the DNN score or CP angles, but need to provide something
+     if(CAT==0) tmp={0, 0.5, 0.8, 1};
+     else if(CAT==1) tmp={0, 0.55, 0.75, 1}; //last bin must be 0.8 to 1, otherwise ratio goes bad.. cutting bins further in two gives issues
+     else if(CAT==2) tmp={0, 0.55, 0.75, 1}; 
+     else if(CAT==3) tmp={0, 0.5, 0.7, 1}; 
+     else if(CAT==4) tmp={0, 0.25, 0.35,0.4, 0.45, 1}; 
+     else if(CAT==5) tmp={0, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 1}; 
+     else if(CAT==6) tmp={0, 0.3, 0.4, 0.5, 0.6, 1}; 
+     else if(CAT==7) tmp={0, 0.35, 0.45, 0.55, 0.65, 0.8, 1}; 
+     else if(CAT==-1) tmp={0, 0.3, 0.6, 1}; //DNN score range in case we pick no category, i.e. it is void observable in for the DNN score or CP angles, but need to provide something
    }
 
    //mu+rho in dp method
-   if(DM==1&&CM==1){
-     if(CAT==0) tmp={0, 0.25, 0.3,0.35, 1}; 
-     if(CAT==1) tmp={0, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1}; 
-     if(CAT==2) tmp={0, 0.35, 0.45, 0.55, 0.65, 1}; 
-     if(CAT==3) tmp={0, 0.25, 0.3, 0.4, 0.45, 0.55, 1}; 
-     if(CAT==4) tmp={0, 0.25, 0.35,0.4, 0.45, 1}; 
-     if(CAT==5) tmp={0, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 1}; 
-     if(CAT==6) tmp={0, 0.3, 0.4, 0.5, 0.6, 1}; 
-     if(CAT==7) tmp={0, 0.35, 0.45, 0.55, 0.65, 0.8, 1}; 
-     if(CAT==8) tmp={0, 0.3, 0.6, 1}; //DNN score range in case we pick no category, i.e. it is void observable in for the DNN score or CP angles, but need to provide something.
+   else if(DM==1&&CM==1){
+     if(CAT==0) tmp={0, 0.5, 0.8, 1}; 
+     else if(CAT==1) tmp={0, 0.55, 0.75, 1}; 
+     else if(CAT==2) tmp={0, 0.55, 0.75, 1}; 
+     else if(CAT==3) tmp={0, 0.5, 0.7, 1}; 
+     else if(CAT==4) tmp={0, 0.25, 0.35,0.4, 0.45, 1}; 
+     else if(CAT==5) tmp={0, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 1}; 
+     else if(CAT==6) tmp={0, 0.3, 0.4, 0.5, 0.6, 1}; 
+     else if(CAT==7) tmp={0, 0.35, 0.45, 0.55, 0.65, 0.8, 1}; 
+     else if(CAT==-1) tmp={0, 0.3, 0.6, 1}; //DNN score range in case we pick no category, i.e. it is void observable in for the DNN score or CP angles, but need to provide something.
    }
 
-   if(DM==11){//other category. We only need signal cats, rest is to avoid crash..
-     if(CAT==0) tmp={0,0.3,1}; 
-     if(CAT==1) tmp={0, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1}; 
-     if(CAT==2) tmp={0, 0.35, 0.45, 0.55, 0.65, 1}; 
-     if(CAT==3) tmp={0, 0.25, 0.3, 0.4, 0.45, 0.55, 1}; 
-     if(CAT==4) tmp={0, 0.25, 0.35,0.4, 0.45,0.5,0.6,1}; 
-     if(CAT==5) tmp={0, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 1}; 
-     if(CAT==6) tmp={0, 0.3, 0.4, 0.5, 0.6, 1}; 
-     if(CAT==7) tmp={0, 0.35, 0.45, 0.55, 0.65, 0.8, 1}; 
-     if(CAT==8) tmp={0, 0.3, 0.6, 1}; //DNN score range in case we pick no category, i.e. it is void observable in for the DNN score or CP angles, but need to provide something.
+   else if(DM==11||DM==10){//other category. We only need signal cats, rest is to avoid crash..
+     if(CAT==0) tmp={0, 0.5, 0.8, 1}; 
+     else if(CAT==1) tmp={0, 0.55, 0.75, 1}; 
+     else if(CAT==2) tmp={0, 0.55, 0.75, 1}; 
+     else if(CAT==3) tmp={0, 0.5, 0.7, 1}; 
+     else if(CAT==4) tmp={0, 0.25, 0.35,0.4, 0.45,0.5,0.6,1}; 
+     else if(CAT==5) tmp={0, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 1}; 
+     else if(CAT==6) tmp={0, 0.3, 0.4, 0.5, 0.6, 1}; 
+     else if(CAT==7) tmp={0, 0.35, 0.45, 0.55, 0.65, 0.8, 1}; 
+     else if(CAT==-1) tmp={0, 0.3, 0.6, 1}; //DNN score range in case we pick no category, i.e. it is void observable in for the DNN score or CP angles, but need to provide something.
    }
    
    NBINS=tmp.size()-1;
